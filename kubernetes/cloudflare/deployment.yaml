@@ -19,12 +19,21 @@ spec:
           requests:
             memory: "64Mi"
             cpu: "100m"
-          limits: 
+          limits:
             memory: "128Mi"
-            cpu: "250m" 
+            cpu: "250m"
         env:
+          # The API key comes from a Secret, not an inline value. A plaintext
+          # credential here lands in git history and is visible to anyone who
+          # can `kubectl describe pod`. Create the secret out-of-band:
+          #   kubectl create secret generic cloudflare-ddns \
+          #     --from-literal=api-key=<your-cloudflare-api-key>
+          # (see secret.example.yaml)
           - name: API_KEY
-            value: some-api-key
+            valueFrom:
+              secretKeyRef:
+                name: cloudflare-ddns
+                key: api-key
           - name: DNS_SERVER
             value: 1.1.1.1
           - name: PROXIED
