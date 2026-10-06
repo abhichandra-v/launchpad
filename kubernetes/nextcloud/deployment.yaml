@@ -18,16 +18,42 @@ spec:
     spec:
       containers:
       - name: nextcloud
-        image: nextcloud
+        # Pin to a major tag so a pod restart can't silently pull a new major.
+        image: nextcloud:30-apache
+        imagePullPolicy: IfNotPresent
         resources:
           requests:
             memory: "128Mi"
             cpu: "100m"
+            ephemeral-storage: "256Mi"
+          # Limits so a leak or spike can't starve the node.
+          limits:
+            memory: "1Gi"
+            cpu: "1"
+            ephemeral-storage: "1Gi"
         env:
           - name: TZ
             value: "${TIMEZONE}"
-        ports: 
+        ports:
         - containerPort: 80
+        # Probes so Kubernetes can tell a wedged pod from a healthy one and
+        # hold traffic until it's actually up. Liveness is a cheap "is the port
+        # open" check; readiness confirms the app is actually serving. Nextcloud
+        # is slow to boot, hence the generous initial delays.
+        livenessProbe:
+          tcpSocket:
+            port: 80
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 6
+        readinessProbe:
+          httpGet:
+            path: /status.php
+            port: 80
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
         volumeMounts:
         - mountPath: /var/www/html
           name: nextcloud-html
